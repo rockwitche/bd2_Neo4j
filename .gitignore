@@ -1,0 +1,15 @@
+bin/
+certificates/
+data/
+labs/
+lib/
+licenses/
+logs/
+metrics/
+plugins/
+products/
+run/
+*.cer
+relate.dbms.json
+.env
+*.log
