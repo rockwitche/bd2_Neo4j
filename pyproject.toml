@@ -1,0 +1,5 @@
+[project]
+name = "dbms-dd6d0074-503b-4eb1-ba85-e810f11e06ee"
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = []

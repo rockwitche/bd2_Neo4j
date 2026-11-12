@@ -1,0 +1,42 @@
+Consultas placeholder
+
+
+// Criar usuário
+MERGE (u:Usuario {email: "trocar"}) ON CREATE SET u.nome = "trocar" RETURN u;
+
+// Avaliar um filme
+MATCH (u:Usuario {email: "trocar"}), (f:Filme {titulo: "trocar"})
+MERGE (u)-[r:AVALIOU]->(f) SET r.nota = trocar, r.data = date()
+RETURN u, r, f;
+
+// Avaliações de um usuário (grafo)
+MATCH (u:Usuario {email: "trocar"})-[r:AVALIOU]->(f:Filme) RETURN u, r, f;
+
+// Avaliações de um usuário (tabela)
+MATCH (:Usuario {email: "trocar"})-[r:AVALIOU]->(f:Filme) RETURN f.titulo, r.nota ORDER BY r.nota DESC;
+
+// Usuário mais compatível
+MATCH (u:Usuario {email: "trocar"})-[a:AVALIOU]->(f:Filme)<-[b:AVALIOU]-(o:Usuario)
+WHERE o <> u
+WITH o, count(f) AS em_comum, avg(abs(a.nota - b.nota)) AS dif
+WHERE em_comum >= trocar
+RETURN o.nome, o.email, em_comum, round(dif, 2) AS dif
+ORDER BY dif ASC, em_comum DESC LIMIT 5;
+
+// Média de um filme
+MATCH (:Usuario)-[a:AVALIOU]->(f:Filme {titulo: "trocar"}) RETURN f.titulo, count(a) AS total, round(avg(a.nota), 2) AS media;
+
+// Filmes de um estúdio
+MATCH (e:Estudio {nome: "trocar"})-[r:PRODUZIU]->(f:Filme) RETURN e, r, f;
+
+// Filmes de um diretor e seus atores
+MATCH (d:Pessoa {nome: "trocar"})-[:DIRIGIU]->(f:Filme)<-[:ATUOU_EM]-(a:Pessoa) RETURN d, f, a;
+
+// Filmes de um gênero
+MATCH (f:Filme)-[:PERTENCE_A]->(g:Genero {nome: "trocar"}) RETURN f.titulo, f.ano ORDER BY f.ano;
+
+// Plano de execução de qualquer consulta: colocar PROFILE ou EXPLAIN antes
+PROFILE MATCH (u:Usuario {trocar: "trocar"}) RETURN u;
+
+// Apagar o usuário de teste depois da demo
+MATCH (u:Usuario {email: "trocar"}) DETACH DELETE u;

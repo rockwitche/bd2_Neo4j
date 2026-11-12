@@ -1,0 +1,128 @@
+CONSULTAS
+
+
+
+--Padrão
+
+MATCH (f:Filme) RETURN count(f) AS filmes;
+MATCH (u:Usuario) RETURN count(u) AS usuarios;
+MATCH ()-[r:AVALIOU]->() RETURN count(r) AS avaliacoes, avg(r.nota) AS media;
+MATCH ()-[r:ASSISTIU]->() RETURN count(r) AS assistiu;
+MATCH (:Pessoa)-[r]->(:Filme) RETURN type(r) AS relacao, count(r) AS total;
+
+
+
+
+
+--grafo
+
+--Filmes de um estúdio
+MATCH (e:Estudio {nome: "Studio Ghibli"})-[r:PRODUZIU]->(f:Filme) RETURN e, r, f;
+
+--Filmes com seus prêmios
+MATCH (f:Filme)-[r:RECEBEU]->(p:Premio) RETURN f, r, p LIMIT 50;
+
+--Filmes de um diretor e seus atores
+MATCH (d:Pessoa {nome: "Christopher Nolan"})-[:DIRIGIU]->(f:Filme)<-[:ATUOU_EM]-(a:Pessoa)
+RETURN d, f, a;
+
+--Filmes de um gênero
+MATCH (f:Filme)-[:PERTENCE_A]->(g:Genero {nome: "Terror"}) RETURN f.titulo, f.ano ORDER BY f.ano;
+
+
+
+
+
+
+--planos de execução
+
+--Busca por e-mail: usa índice (NodeUniqueIndexSeek), poucos db hits
+PROFILE MATCH (u:Usuario {email: "usuario500@exemplo.com"}) RETURN u;
+
+--Busca por nome: sem índice, varre todos os usuários (NodeByLabelScan)
+PROFILE MATCH (u:Usuario {nome: "Ana Silva"}) RETURN count(u);
+
+--Criar índice em nome e repetir a 3.2 para comparar
+CREATE INDEX usuario_nome IF NOT EXISTS FOR (u:Usuario) ON (u.nome);
+PROFILE MATCH (u:Usuario {nome: "Ana Silva"}) RETURN count(u);
+
+--EXPLAIN mostra o plano sem executar a consulta
+EXPLAIN MATCH (u:Usuario {email: "usuario500@exemplo.com"})-[:AVALIOU]->(f:Filme) RETURN f.titulo;
+
+--Remover o índice (para poder refazer a demo)
+DROP INDEX usuario_nome IF EXISTS;
+
+
+
+
+
+--cadastro e avalições
+
+--Contagem de avaliações (rodar antes e depois do simulador)
+MATCH ()-[r:AVALIOU]->() RETURN count(r);
+
+--Ver um usuário novo e suas avaliações no grafo
+MATCH (u:Usuario {email: "luiza@exemplo.com"})-[r:AVALIOU]->(f:Filme) RETURN u, r, f;
+
+--Lista em tabela
+MATCH (:Usuario {email: "luiza@exemplo.com"})-[r:AVALIOU]->(f:Filme)
+RETURN f.titulo, r.nota ORDER BY r.nota DESC;
+
+--Usuários com mais avaliações (bons candidatos para teste)
+MATCH (u:Usuario)-[r:AVALIOU]->() RETURN u.email, count(r) AS total ORDER BY total DESC LIMIT 5;
+
+--Corrigir e-mail da Nana
+MATCH (u:Usuario {email: "nana@exemplocom"}) SET u.email = "nana@exemplo.com";
+
+
+
+
+
+
+--usuário mais compatível
+
+MATCH (u:Usuario {email: "usuario94@exemplo.com"})-[a:AVALIOU]->(f:Filme)<-[b:AVALIOU]-(o:Usuario)
+WHERE o <> u
+WITH o, count(f) AS em_comum, avg(abs(a.nota - b.nota)) AS dif
+WHERE em_comum >= 2
+RETURN o.nome, o.email, em_comum, round(dif, 2) AS dif
+ORDER BY dif ASC, em_comum DESC LIMIT 5;
+
+
+
+
+
+
+--análises
+
+--Top 10 filmes (mais de 100 avaliações)
+MATCH (:Usuario)-[a:AVALIOU]->(f:Filme)
+WITH f, count(a) AS total, avg(a.nota) AS media
+WHERE total > 100
+RETURN f.titulo, total, round(media, 2) AS media
+ORDER BY media DESC LIMIT 10;
+
+
+
+
+
+
+--média de notas por gênero
+MATCH (:Usuario)-[a:AVALIOU]->(f:Filme)-[:PERTENCE_A]->(g:Genero)
+RETURN g.nome, count(a) AS avaliacoes, round(avg(a.nota), 2) AS media
+ORDER BY media DESC;
+
+
+
+
+
+
+--filmes premiados com a média de nota
+MATCH (f:Filme)-[:RECEBEU]->(p:Premio)
+OPTIONAL MATCH (:Usuario)-[a:AVALIOU]->(f)
+RETURN f.titulo, p.nome, round(avg(a.nota), 2) AS media
+ORDER BY media DESC LIMIT 10;
+
+
+
+--cadastros
