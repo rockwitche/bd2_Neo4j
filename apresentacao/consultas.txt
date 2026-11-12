@@ -16,6 +16,27 @@ MATCH (:Pessoa)-[r]->(:Filme) RETURN type(r) AS relacao, count(r) AS total;
 
 --grafo
 
+MATCH (u:Usuario)
+WITH u LIMIT 100
+MATCH (u)-[r:AVALIOU]->(f:Filme)
+RETURN u, r, f;
+
+MATCH (f:Filme {titulo:"Matrix"})-[r]-(n) RETURN f, r, n LIMIT 50;
+
+MATCH (u:Usuario)-[r:AVALIOU]->(f:Filme)
+WITH f, count(r) AS avaliacoes
+ORDER BY avaliacoes DESC
+MATCH (f)-[p:PERTENCE_A]->(g:Genero)
+RETURN f, p, g;
+
+--rede social
+MATCH (u:Usuario {email: "usuario1@exemplo.com"})-[a:AVALIOU]->(f:Filme)<-[b:AVALIOU]-(outro:Usuario)
+WHERE outro <> u AND a.nota = b.nota
+RETURN outro.email AS usuario, count(f) AS filmes_em_comum
+ORDER BY filmes_em_comum DESC
+LIMIT 10;
+
+
 --Filmes de um estúdio
 MATCH (e:Estudio {nome: "Studio Ghibli"})-[r:PRODUZIU]->(f:Filme) RETURN e, r, f;
 
@@ -70,9 +91,6 @@ RETURN f.titulo, r.nota ORDER BY r.nota DESC;
 
 --Usuários com mais avaliações (bons candidatos para teste)
 MATCH (u:Usuario)-[r:AVALIOU]->() RETURN u.email, count(r) AS total ORDER BY total DESC LIMIT 5;
-
---Corrigir e-mail da Nana
-MATCH (u:Usuario {email: "nana@exemplocom"}) SET u.email = "nana@exemplo.com";
 
 
 
