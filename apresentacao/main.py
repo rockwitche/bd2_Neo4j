@@ -16,32 +16,54 @@ PASSWORD = os.getenv("NEO4J_PASSWORD", "Jupiter07?")
 
 driver = GraphDatabase.driver(URI, auth=(USER, PASSWORD))
 
+
 def run(query, **params):
     with driver.session() as session:
         return list(session.run(query, **params))
 
 
-def cadastrar_usuario(email, nome):
-    run(
-        """
-        MERGE (u:Usuario {email: $email})
-        ON CREATE SET u.nome = $nome
-        """,
-        email=email, nome=nome,
+def usuario_existe(email):
+    return bool(run("MATCH (u:Usuario {email: $email}) RETURN u", email=email))
+
+
+def filme_existe(titulo):
+    return bool(run("MATCH (f:Filme {titulo: $titulo}) RETURN f", titulo=titulo))
+
+
+def ja_avaliou(email, titulo):
+    return bool(
+        run(
+            """
+            MATCH (:Usuario {email: $email})-[r:AVALIOU]->(:Filme {titulo: $titulo})
+            RETURN r
+            """,
+            email=email, titulo=titulo,
+        )
     )
+
+
+def cadastrar_usuario(email, nome):
+    if usuario_existe(email):
+        return False
+    run("CREATE (:Usuario {email: $email, nome: $nome})", email=email, nome=nome)
+    return True
 
 
 def avaliar(email, titulo, nota):
-    r = run(
+    if not usuario_existe(email):
+        return "sem_usuario"
+    if not filme_existe(titulo):
+        return "sem_filme"
+    if ja_avaliou(email, titulo):
+        return "ja_avaliado"
+    run(
         """
         MATCH (u:Usuario {email: $email}), (f:Filme {titulo: $titulo})
-        MERGE (u)-[r:AVALIOU]->(f)
-        SET r.nota = $nota, r.data = date($data)
-        RETURN f.titulo AS titulo
+        CREATE (u)-[:AVALIOU {nota: $nota, data: date($data)}]->(f)
         """,
         email=email, titulo=titulo, nota=nota, data=str(date.today()),
     )
-    return bool(r)
+    return "ok"
 
 
 def minhas_avaliacoes(email):
@@ -79,7 +101,6 @@ def top_filmes(n=10):
 
 
 def usuario_compativel(email, minimo=2):
-    # compara as notas nos filmes que os dois avaliaram: menor diferença média = mais compatível
     r = run(
         """
         MATCH (u:Usuario {email: $email})-[a:AVALIOU]->(f:Filme)<-[b:AVALIOU]-(o:Usuario)
@@ -94,18 +115,27 @@ def usuario_compativel(email, minimo=2):
     return r[0] if r else None
 
 
-def simulador(qtd=20, intervalo=1.0):
-    """Insere avaliações aleatórias, uma por segundo, e mostra o total subindo."""
+def simulador(qtd=300, intervalo=0.05):
     filmes = [r["titulo"] for r in run("MATCH (f:Filme) RETURN f.titulo AS titulo")]
-    for _ in range(qtd):
+    criadas = 0
+    while criadas < qtd:
         email = f"usuario{random.randint(1, 100000)}@exemplo.com"
         titulo = random.choice(filmes)
         nota = random.randint(1, 5)
-        avaliar(email, titulo, nota)
+        if avaliar(email, titulo, nota) != "ok":
+            continue
+        criadas += 1
         total = run("MATCH ()-[r:AVALIOU]->() RETURN count(r) AS c")[0]["c"]
-        print(f"{email} deu {nota} para '{titulo}' | total de avaliações: {total}")
+        print(f"[{criadas}/{qtd}] {email} deu {nota} para '{titulo}' | total de avaliações: {total}")
         time.sleep(intervalo)
 
+
+MENSAGENS = {
+    "ok": "Avaliação salva.",
+    "sem_usuario": "Usuário não cadastrado. Use a opção 1 primeiro.",
+    "sem_filme": "Filme não encontrado. Confira o título exato.",
+    "ja_avaliado": "Esse usuário já avaliou esse filme.",
+}
 
 MENU = """
 1) Cadastrar usuário
@@ -122,27 +152,36 @@ if __name__ == "__main__":
     while True:
         op = input(MENU).strip()
         if op == "1":
-            cadastrar_usuario(input("email: "), input("nome: "))
-            print("Usuário cadastrado.")
-        elif op == "2":
-            email = input("email: ")
-            titulo = input("filme (título exato): ")
-            if avaliar(email, titulo, int(input("nota (1-5): "))):
-                print("Avaliação salva.")
+            email = input("email: ").strip()
+            nome = input("nome: ").strip()
+            if cadastrar_usuario(email, nome):
+                print("Usuário cadastrado.")
             else:
-                print("Usuário ou filme não encontrado. Confira o e-mail e o título.")
+                print("Esse e-mail já está cadastrado.")
+        elif op == "2":
+            email = input("email: ").strip()
+            titulo = input("filme (título exato): ").strip()
+            try:
+                nota = int(input("nota (1-5): "))
+            except ValueError:
+                print("Nota inválida.")
+                continue
+            if not 1 <= nota <= 5:
+                print("A nota deve ser de 1 a 5.")
+                continue
+            print(MENSAGENS[avaliar(email, titulo, nota)])
         elif op == "3":
-            for r in minhas_avaliacoes(input("email: ")):
+            for r in minhas_avaliacoes(input("email: ").strip()):
                 print(f"{r['titulo']}: {r['nota']}")
         elif op == "4":
-            r = usuario_compativel(input("seu email: "))
+            r = usuario_compativel(input("seu email: ").strip())
             if r:
                 print(f"Mais compatível: {r['nome']} ({r['email']})")
                 print(f"{r['em_comum']} filmes em comum, diferença média de nota: {r['dif']}")
             else:
                 print("Nenhum usuário compatível encontrado.")
         elif op == "5":
-            total, media = media_filme(input("filme: "))
+            total, media = media_filme(input("filme: ").strip())
             print(f"{total} avaliações, média {media}")
         elif op == "6":
             for r in top_filmes():

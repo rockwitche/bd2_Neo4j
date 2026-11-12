@@ -125,4 +125,16 @@ ORDER BY media DESC LIMIT 10;
 
 
 
---cadastros
+
+
+
+
+
+
+
+--números
+
+
+MATCH (n) RETURN "Nó: " + labels(n)[0] AS entidade, count(*) AS total
+UNION ALL
+MATCH ()-[r]->() RETURN "Relação: " + type(r) AS entidade, count(*) AS total;
